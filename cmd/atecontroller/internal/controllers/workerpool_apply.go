@@ -546,8 +546,8 @@ func applyWorkerPoolPodTemplate(
 		return
 	}
 
-	if tmpl.ServiceAccountName != "" {
-		podSpecAC.WithServiceAccountName(tmpl.ServiceAccountName)
+	if tmpl.ServiceAccountName != nil && *tmpl.ServiceAccountName != "" {
+		podSpecAC.WithServiceAccountName(*tmpl.ServiceAccountName)
 	}
 	if tmpl.NodeSelector != nil {
 		podSpecAC.WithNodeSelector(tmpl.NodeSelector)

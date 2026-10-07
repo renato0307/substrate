@@ -28,6 +28,7 @@ import (
 	appsv1ac "k8s.io/client-go/applyconfigurations/apps/v1"
 	corev1ac "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
+	"k8s.io/utils/ptr"
 
 	"github.com/agent-substrate/substrate/internal/ateomcapacity"
 	"github.com/agent-substrate/substrate/internal/deviceplugin"
@@ -768,7 +769,8 @@ func TestBuildDeploymentWorkerServiceAccount(t *testing.T) {
 		}{
 			{name: "omitted", want: "default"},
 			{name: "empty", tmpl: &atev1alpha1.WorkerPoolPodTemplate{}, want: "default"},
-			{name: "configured", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: "substrate-worker"}, want: "substrate-worker"},
+			{name: "explicit empty", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: ptr.To("")}, want: "default"},
+			{name: "configured", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: ptr.To("substrate-worker")}, want: "substrate-worker"},
 		} {
 			t.Run(string(class)+"/"+tc.name, func(t *testing.T) {
 				wp := testWorkerPoolApplyConfig(tc.tmpl)

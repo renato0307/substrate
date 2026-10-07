@@ -55,7 +55,7 @@ type WorkerPoolPodTemplate struct {
 	// +optional
 	// +kubebuilder:validation:MaxLength=253
 	// +kubebuilder:validation:Pattern=`^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
-	ServiceAccountName string `json:"serviceAccountName,omitempty"`
+	ServiceAccountName *string `json:"serviceAccountName,omitempty"`
 
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	//

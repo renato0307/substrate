@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const gpuResourceName = corev1.ResourceName("nvidia.com/gpu")
@@ -244,7 +245,7 @@ func TestWorkerPoolServiceAccountValidation(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{GenerateName: "test-service-account-", Namespace: "default"},
 				Spec: WorkerPoolSpec{
 					Replicas: 1, WorkerImage: "ateom:latest",
-					Template: &WorkerPoolPodTemplate{ServiceAccountName: tc.value},
+					Template: &WorkerPoolPodTemplate{ServiceAccountName: ptr.To(tc.value)},
 				},
 			}
 			err := k8sClient.Create(t.Context(), wp)
@@ -257,8 +258,8 @@ func TestWorkerPoolServiceAccountValidation(t *testing.T) {
 			if err != nil && !strings.Contains(err.Error(), "spec.template.serviceAccountName") {
 				t.Fatalf("unexpected validation error: %v", err)
 			}
-			if err == nil && wp.Spec.Template.ServiceAccountName != tc.value {
-				t.Fatalf("stored serviceAccountName = %q, want %q", wp.Spec.Template.ServiceAccountName, tc.value)
+			if err == nil && (wp.Spec.Template.ServiceAccountName == nil || *wp.Spec.Template.ServiceAccountName != tc.value) {
+				t.Fatalf("stored serviceAccountName = %v, want %q", wp.Spec.Template.ServiceAccountName, tc.value)
 			}
 		})
 	}

@@ -37,6 +37,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -358,10 +359,10 @@ func TestWorkerPoolServiceAccountUpdate(t *testing.T) {
 		tmpl *atev1alpha1.WorkerPoolPodTemplate
 		want string
 	}{
-		{name: "set", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: "substrate-worker"}, want: "substrate-worker"},
-		{name: "change", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: "substrate-worker-v2"}, want: "substrate-worker-v2"},
+		{name: "set", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: ptr.To("substrate-worker")}, want: "substrate-worker"},
+		{name: "change", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: ptr.To("substrate-worker-v2")}, want: "substrate-worker-v2"},
 		{name: "clear field", tmpl: &atev1alpha1.WorkerPoolPodTemplate{}, want: "default"},
-		{name: "set again", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: "substrate-worker"}, want: "substrate-worker"},
+		{name: "set again", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: ptr.To("substrate-worker")}, want: "substrate-worker"},
 		{name: "clear template", want: "default"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
