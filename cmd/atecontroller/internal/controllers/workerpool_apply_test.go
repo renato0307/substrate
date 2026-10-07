@@ -759,6 +759,43 @@ func testWorkerPoolApplyConfig(tmpl *atev1alpha1.WorkerPoolPodTemplate) *atev1al
 	}
 }
 
+func TestBuildDeploymentWorkerServiceAccount(t *testing.T) {
+	for _, class := range []atev1alpha1.SandboxClass{atev1alpha1.SandboxClassGvisor, atev1alpha1.SandboxClassMicroVM} {
+		for _, tc := range []struct {
+			name string
+			tmpl *atev1alpha1.WorkerPoolPodTemplate
+			want string
+		}{
+			{name: "omitted", want: "default"},
+			{name: "empty", tmpl: &atev1alpha1.WorkerPoolPodTemplate{}, want: "default"},
+			{name: "configured", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: "substrate-worker"}, want: "substrate-worker"},
+		} {
+			t.Run(string(class)+"/"+tc.name, func(t *testing.T) {
+				wp := testWorkerPoolApplyConfig(tc.tmpl)
+				wp.Spec.SandboxClass = class
+				got := buildDeploymentApplyConfig(wp, ateomOTelSettings{}, installdefaults.SystemNamespace, installdefaults.AteletServiceAccount, installdefaults.RouterServiceAccount)
+				ps := got.Spec.Template.Spec
+				if ps.ServiceAccountName == nil || *ps.ServiceAccountName != tc.want {
+					t.Fatalf("serviceAccountName = %v, want %q", ps.ServiceAccountName, tc.want)
+				}
+				// Choosing a worker identity must not change credential projections,
+				// API token mounting policy, or the identities of its trusted peers.
+				wp.Spec.Template = nil
+				baseline := buildDeploymentApplyConfig(wp, ateomOTelSettings{}, installdefaults.SystemNamespace, installdefaults.AteletServiceAccount, installdefaults.RouterServiceAccount)
+				if diff := cmp.Diff(baseline.Spec.Template.Spec.Volumes, ps.Volumes); diff != "" {
+					t.Errorf("credential volumes changed (-want +got):\n%s", diff)
+				}
+				if diff := cmp.Diff(baseline.Spec.Template.Spec.Containers[0].Args, ps.Containers[0].Args); diff != "" {
+					t.Errorf("peer identities changed (-want +got):\n%s", diff)
+				}
+				if ps.AutomountServiceAccountToken != nil {
+					t.Error("worker overrides ServiceAccount API token mounting policy")
+				}
+			})
+		}
+	}
+}
+
 func expectedDeploymentApplyConfig(mutatePodSpec func(*corev1ac.PodSpecApplyConfiguration)) *appsv1ac.DeploymentApplyConfiguration {
 	wp := testWorkerPoolApplyConfig(nil)
 
@@ -890,6 +927,7 @@ func expectedDeploymentApplyConfig(mutatePodSpec func(*corev1ac.PodSpecApplyConf
 	podSpecAC.Tolerations = []corev1ac.TolerationApplyConfiguration{
 		sandboxClassTolerationAC(atev1alpha1.SandboxClassGvisor),
 	}
+	podSpecAC.WithServiceAccountName("default")
 	podSpecAC.WithPriorityClassName("")
 	podSpecAC.WithAffinity(corev1ac.Affinity())
 	podSpecAC.WithTerminationGracePeriodSeconds(workerTerminationGracePeriodSeconds)

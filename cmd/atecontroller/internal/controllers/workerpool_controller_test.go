@@ -336,6 +336,43 @@ func TestStatusReplicasPropagation(t *testing.T) {
 	})
 }
 
+func TestWorkerPoolServiceAccountUpdate(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	wp := makeWorkerPool("test-service-account-update", "default", 1, "ateom:v1")
+	if err := k8sClient.Create(ctx, wp); err != nil {
+		t.Fatalf("create WorkerPool: %v", err)
+	}
+	deleteOnCleanup(t, wp)
+
+	assertServiceAccount := func(t *testing.T, want string) {
+		t.Helper()
+		eventually(t, func(ctx context.Context) (bool, error) {
+			dep, err := getDeployment(ctx, wp)
+			return err == nil && dep.Spec.Template.Spec.ServiceAccountName == want, nil
+		})
+	}
+	assertServiceAccount(t, "default")
+	for _, tc := range []struct {
+		name string
+		tmpl *atev1alpha1.WorkerPoolPodTemplate
+		want string
+	}{
+		{name: "set", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: "substrate-worker"}, want: "substrate-worker"},
+		{name: "change", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: "substrate-worker-v2"}, want: "substrate-worker-v2"},
+		{name: "clear field", tmpl: &atev1alpha1.WorkerPoolPodTemplate{}, want: "default"},
+		{name: "set again", tmpl: &atev1alpha1.WorkerPoolPodTemplate{ServiceAccountName: "substrate-worker"}, want: "substrate-worker"},
+		{name: "clear template", want: "default"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			updateWorkerPoolSpec(t, ctx, wp, "update WorkerPool ServiceAccount", func(current *atev1alpha1.WorkerPool) {
+				current.Spec.Template = tc.tmpl
+			})
+			assertServiceAccount(t, tc.want)
+		})
+	}
+}
+
 func sampleWorkerPoolPodTemplate() *atev1alpha1.WorkerPoolPodTemplate {
 	return &atev1alpha1.WorkerPoolPodTemplate{
 		NodeSelector: map[string]string{

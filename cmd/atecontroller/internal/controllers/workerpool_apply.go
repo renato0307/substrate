@@ -534,6 +534,9 @@ func applyWorkerPoolPodTemplate(
 ) {
 	podSpecAC.NodeSelector = map[string]string{}
 	podSpecAC.Tolerations = []corev1ac.TolerationApplyConfiguration{}
+	// Apply an explicit default so clearing the field cannot restore the old
+	// name through Kubernetes' deprecated serviceAccount alias.
+	podSpecAC.WithServiceAccountName("default")
 	podSpecAC.WithPriorityClassName("")
 	podSpecAC.WithAffinity(corev1ac.Affinity())
 	resourcesAC := corev1ac.ResourceRequirements()
@@ -543,6 +546,9 @@ func applyWorkerPoolPodTemplate(
 		return
 	}
 
+	if tmpl.ServiceAccountName != "" {
+		podSpecAC.WithServiceAccountName(tmpl.ServiceAccountName)
+	}
 	if tmpl.NodeSelector != nil {
 		podSpecAC.WithNodeSelector(tmpl.NodeSelector)
 	}

@@ -26,7 +26,7 @@ import (
 // +kubebuilder:validation:Pattern=`^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$`
 type WorkerPoolLabelValue string
 
-// WorkerPoolPodTemplate defines optional metadata, scheduling, and resource
+// WorkerPoolPodTemplate defines optional metadata, identity, scheduling, and resource
 // settings for worker workloads. NodeAffinity is mapped to
 // spec.affinity.nodeAffinity on the pod.
 type WorkerPoolPodTemplate struct {
@@ -47,6 +47,15 @@ type WorkerPoolPodTemplate struct {
 	// +kubebuilder:validation:XValidation:rule="self.all(key, !key.startsWith('ate.dev/') && !key.contains('.ate.dev/'))",message="ate.dev and its subdomains are reserved"
 	// +kubebuilder:validation:XValidation:rule="self.all(key, !format.qualifiedName().validate(key).hasValue())",message="annotation keys must be valid Kubernetes qualified names"
 	Annotations map[string]string `json:"annotations,omitempty"`
+
+	// ServiceAccountName is the ServiceAccount used by worker pods. It must
+	// already exist in the WorkerPool's namespace. Empty uses the namespace's
+	// default ServiceAccount. The controller does not create it or grant permissions.
+	//
+	// +optional
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	ServiceAccountName string `json:"serviceAccountName,omitempty"`
 
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	//
@@ -88,7 +97,7 @@ type WorkerPoolSpec struct {
 	// +required
 	WorkerImage string `json:"workerImage"`
 
-	// Template holds optional metadata, scheduling, and resource settings for worker workloads.
+	// Template holds optional metadata, identity, scheduling, and resource settings for worker workloads.
 	//
 	// +optional
 	Template *WorkerPoolPodTemplate `json:"template,omitempty"`
