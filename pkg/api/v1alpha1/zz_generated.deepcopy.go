@@ -298,6 +298,11 @@ func (in *WorkerPoolPodTemplate) DeepCopyInto(out *WorkerPoolPodTemplate) {
 			(*out)[key] = val
 		}
 	}
+	if in.ServiceAccountName != nil {
+		in, out := &in.ServiceAccountName, &out.ServiceAccountName
+		*out = new(string)
+		**out = **in
+	}
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
 		*out = make(map[string]string, len(*in))

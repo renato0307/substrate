@@ -13,7 +13,7 @@ The `WorkerPool` defines the pool of physical "warm" compute capacity. It manage
 | `replicas` | `int32` | **Required.** Number of physical standby pods to maintain in the cluster. |
 | `workerImage` | `string` | **Required.** The container image for the `ateom` herder process (e.g. `ko://github.com/agent-substrate/substrate/cmd/ateom-gvisor`). |
 | `sandboxClass` | `string` | Optional. The sandbox runtime family for the pool: `gvisor` (default) or `microvm`. Drives the worker pod shape (e.g. KVM device mounts, node placement). The sandbox binaries themselves come from the [`SandboxConfig`](#3-sandboxconfig-the-sandbox-itself) each `ActorTemplate` selects. |
-| `template` | `WorkerPoolPodTemplate` | **Optional.** Metadata, scheduling, and resource settings for worker workloads. |
+| `template` | `WorkerPoolPodTemplate` | **Optional.** Metadata, identity, scheduling, and resource settings for worker workloads. |
 
 #### `WorkerPoolPodTemplate` (`spec.template`)
 
@@ -21,6 +21,7 @@ The `WorkerPool` defines the pool of physical "warm" compute capacity. It manage
 | :--- | :--- | :--- |
 | `labels` | `map[string]string` | Generated Deployment and `spec.template.metadata.labels` (max 64) |
 | `annotations` | `map[string]string` | Generated Deployment and `spec.template.metadata.annotations` (max 64) |
+| `serviceAccountName` | `string` | `spec.serviceAccountName`; existing ServiceAccount in the WorkerPool's namespace (empty uses `default`) |
 | `nodeSelector` | `map[string]string` | `spec.nodeSelector` |
 | `tolerations` | `[]Toleration` | `spec.tolerations` (max 16) |
 | `priorityClassName` | `string` | `spec.priorityClassName` |
@@ -35,6 +36,43 @@ syntax.
 `template.labels` and `template.annotations` only configure Kubernetes workload
 metadata; they do not affect actor scheduling. Actor selectors match
 `WorkerPool.metadata.labels`, not `WorkerPool.spec.template.labels`.
+
+#### Worker ServiceAccount (`template.serviceAccountName`)
+
+For clusters that require a non-default ServiceAccount, create a dedicated account
+in the WorkerPool's namespace and reference it:
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: substrate-worker
+  namespace: ate-demo
+---
+apiVersion: ate.dev/v1alpha1
+kind: WorkerPool
+metadata:
+  name: agent-pool
+  namespace: ate-demo
+spec:
+  replicas: 1
+  workerImage: ko://github.com/agent-substrate/substrate/cmd/ateom-gvisor
+  template:
+    serviceAccountName: substrate-worker
+```
+
+The name must be a Kubernetes DNS subdomain (at most 253 characters). Omitting or
+clearing it uses the namespace's `default` ServiceAccount. Changing it updates the
+Deployment's pod template and rolls the workers. The operator is responsible for
+creating the account; the controller creates no ServiceAccount, RBAC bindings, or
+cloud permissions. Grant only permissions required by your deployment.
+
+Worker PodCertificate projections remain configured, and the certificate signer
+uses the worker's selected ServiceAccount identity. Kubernetes still controls
+automatic API token mounting through the selected ServiceAccount; this field does
+not override it. The controller's `--atelet-service-account` flag identifies the
+credential broker, not the worker's ServiceAccount, and should not be changed to
+match this field.
 
 #### Pin pools to the installed substrate version (`template.nodeSelector`)
 

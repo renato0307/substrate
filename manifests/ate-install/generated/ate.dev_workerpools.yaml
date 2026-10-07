@@ -88,8 +88,8 @@ spec:
                 - microvm
                 type: string
               template:
-                description: Template holds optional metadata, scheduling, and resource
-                  settings for worker workloads.
+                description: Template holds optional metadata, identity, scheduling,
+                  and resource settings for worker workloads.
                 properties:
                   annotations:
                     additionalProperties:
@@ -392,6 +392,14 @@ spec:
                           More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                         type: object
                     type: object
+                  serviceAccountName:
+                    description: |-
+                      ServiceAccountName is the ServiceAccount used by worker pods. It must
+                      already exist in the WorkerPool's namespace. Empty uses the namespace's
+                      default ServiceAccount. The controller does not create it or grant permissions.
+                    maxLength: 253
+                    pattern: ^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                    type: string
                   tolerations:
                     description: Tolerations for the worker pods.
                     items:

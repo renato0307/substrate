@@ -45,20 +45,29 @@ func workerContext(t *testing.T, podUID string) context.Context {
 }
 
 func TestVerifyClientOnSameNode(t *testing.T) {
-	state := tls.ConnectionState{PeerCertificates: []*x509.Certificate{workerCertificate(t, "worker-uid", "node-a")}}
-	nodeA := &substratex509.PodIdentity{NodeName: "node-a", NodeUID: "node-uid"}
-	if err := verifyClientOnSameNode(nodeA)(state); err != nil {
-		t.Fatalf("same-node worker rejected: %v", err)
-	}
-	if err := verifyClientOnSameNode(&substratex509.PodIdentity{NodeName: "node-b", NodeUID: "node-uid"})(state); err == nil {
-		t.Fatal("cross-node worker accepted")
-	}
-	if err := verifyClientOnSameNode(&substratex509.PodIdentity{NodeName: "node-a", NodeUID: "replacement-node"})(state); err == nil {
-		t.Fatal("replacement node accepted")
+	for _, serviceAccount := range []string{"default", "substrate-worker"} {
+		t.Run(serviceAccount, func(t *testing.T) {
+			state := tls.ConnectionState{PeerCertificates: []*x509.Certificate{workerCertificateWithServiceAccount(t, "worker-uid", "node-a", serviceAccount)}}
+			nodeA := &substratex509.PodIdentity{NodeName: "node-a", NodeUID: "node-uid"}
+			if err := verifyClientOnSameNode(nodeA)(state); err != nil {
+				t.Fatalf("same-node worker rejected: %v", err)
+			}
+			if err := verifyClientOnSameNode(&substratex509.PodIdentity{NodeName: "node-b", NodeUID: "node-uid"})(state); err == nil {
+				t.Fatal("cross-node worker accepted")
+			}
+			if err := verifyClientOnSameNode(&substratex509.PodIdentity{NodeName: "node-a", NodeUID: "replacement-node"})(state); err == nil {
+				t.Fatal("replacement node accepted")
+			}
+		})
 	}
 }
 
 func workerCertificate(t *testing.T, podUID, nodeName string) *x509.Certificate {
+	t.Helper()
+	return workerCertificateWithServiceAccount(t, podUID, nodeName, "default")
+}
+
+func workerCertificateWithServiceAccount(t *testing.T, podUID, nodeName, serviceAccount string) *x509.Certificate {
 	t.Helper()
 	_, key, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -66,7 +75,7 @@ func workerCertificate(t *testing.T, podUID, nodeName string) *x509.Certificate 
 	}
 	template := &x509.Certificate{SerialNumber: big.NewInt(1), NotBefore: time.Now().Add(-time.Minute), NotAfter: time.Now().Add(time.Hour)}
 	if err := substratex509.AddPodIdentityToCertificate(&substratex509.PodIdentity{
-		Namespace: "workers", ServiceAccountName: "default", ServiceAccountUID: "sa-uid",
+		Namespace: "workers", ServiceAccountName: serviceAccount, ServiceAccountUID: "sa-uid",
 		PodName: "worker", PodUID: podUID, NodeName: nodeName, NodeUID: "node-uid",
 	}, template); err != nil {
 		t.Fatal(err)

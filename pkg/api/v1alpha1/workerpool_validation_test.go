@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const gpuResourceName = corev1.ResourceName("nvidia.com/gpu")
@@ -214,6 +215,51 @@ func TestWorkerPoolValidation(t *testing.T) {
 
 			if err == nil {
 				_ = k8sClient.Delete(ctx, wp)
+			}
+		})
+	}
+}
+
+func TestWorkerPoolServiceAccountValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		value   string
+		wantErr bool
+	}{
+		{name: "empty"},
+		{name: "default", value: "default"},
+		{name: "dedicated", value: "substrate-worker"},
+		{name: "subdomain", value: "worker.example.com"},
+		{name: "maximum length", value: strings.Repeat("a", 253)},
+		{name: "too long", value: strings.Repeat("a", 254), wantErr: true},
+		{name: "uppercase", value: "Worker", wantErr: true},
+		{name: "underscore", value: "worker_sa", wantErr: true},
+		{name: "namespace qualified", value: "workers/worker", wantErr: true},
+		{name: "leading hyphen", value: "-worker", wantErr: true},
+		{name: "trailing hyphen", value: "worker-", wantErr: true},
+		{name: "empty DNS label", value: "worker..example", wantErr: true},
+		{name: "whitespace", value: "worker sa", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wp := &WorkerPool{
+				ObjectMeta: metav1.ObjectMeta{GenerateName: "test-service-account-", Namespace: "default"},
+				Spec: WorkerPoolSpec{
+					Replicas: 1, WorkerImage: "ateom:latest",
+					Template: &WorkerPoolPodTemplate{ServiceAccountName: ptr.To(tc.value)},
+				},
+			}
+			err := k8sClient.Create(t.Context(), wp)
+			if err == nil {
+				t.Cleanup(func() { _ = k8sClient.Delete(context.Background(), wp) })
+			}
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("create WorkerPool: %v, wantErr %v", err, tc.wantErr)
+			}
+			if err != nil && !strings.Contains(err.Error(), "spec.template.serviceAccountName") {
+				t.Fatalf("unexpected validation error: %v", err)
+			}
+			if err == nil && (wp.Spec.Template.ServiceAccountName == nil || *wp.Spec.Template.ServiceAccountName != tc.value) {
+				t.Fatalf("stored serviceAccountName = %v, want %q", wp.Spec.Template.ServiceAccountName, tc.value)
 			}
 		})
 	}
